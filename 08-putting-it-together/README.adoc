@@ -1,0 +1,329 @@
+= Module 8: Building a High-Performance API Server
+:toc:
+:toc-placement!:
+
+toc::[]
+
+== Overview
+
+This final module brings together all the concepts we've learned to build a high-performance API server. We'll implement different server architectures and compare their performance characteristics, demonstrating how to choose the right approach for different workloads.
+
+**Duration**: 3 minutes
+
+== Learning Objectives
+
+* Combine networking, threading, multiprocessing, and async concepts
+* Build three server implementations: threaded, multiprocess, and async
+* Understand trade-offs between different architectures
+* Implement production-ready features: connection pooling, rate limiting, monitoring
+* Measure and optimize performance
+
+== Server Architecture Comparison
+
+[mermaid, target=server-architectures, format=svg]
+....
+graph TD
+    subgraph "Threaded Server"
+        TS[Main Thread] --> TP[Thread Pool]
+        TP --> T1[Worker Thread 1]
+        TP --> T2[Worker Thread 2]
+        TP --> T3[Worker Thread 3]
+        T1 --> REQ1[Request Handler]
+        T2 --> REQ2[Request Handler]
+        T3 --> REQ3[Request Handler]
+    end
+    
+    subgraph "Multiprocess Server"
+        MS[Master Process] --> MP[Process Pool]
+        MP --> P1[Worker Process 1]
+        MP --> P2[Worker Process 2]
+        MP --> P3[Worker Process 3]
+        P1 --> PREQ1[Request Handler]
+        P2 --> PREQ2[Request Handler]
+        P3 --> PREQ3[Request Handler]
+    end
+    
+    subgraph "Async Server"
+        AS[Event Loop] --> C1[Coroutine 1]
+        AS --> C2[Coroutine 2]
+        AS --> C3[Coroutine 3]
+        AS --> C4[Coroutine N...]
+        C1 -.-> IO1[I/O Operation]
+        C2 -.-> IO2[I/O Operation]
+    end
+....
+
+== Performance Characteristics
+
+[cols="2,2,2,2", options="header"]
+|===
+|Characteristic |Threaded |Multiprocess |Async
+
+|CPU-bound performance
+|Limited (GIL)
+|Excellent
+|Poor
+
+|I/O-bound performance
+|Good
+|Good
+|Excellent
+
+|Memory usage
+|Medium
+|High
+|Low
+
+|Startup time
+|Fast
+|Slow
+|Fast
+
+|Max connections
+|~1000s
+|~1000s
+|~100,000s
+
+|Complexity
+|Medium
+|High
+|High
+
+|Debugging
+|Medium
+|Hard
+|Hard
+|===
+
+== Request Flow Through the Stack
+
+[mermaid, target=request-flow, format=svg]
+....
+sequenceDiagram
+    participant Client
+    participant NIC
+    participant Kernel
+    participant Server
+    participant Handler
+    participant DB
+    
+    Client->>NIC: HTTP Request
+    NIC->>Kernel: Packet (DMA)
+    Kernel->>Server: Socket data ready
+    Server->>Server: Accept connection
+    Server->>Handler: Dispatch to handler
+    Handler->>DB: Query data
+    DB-->>Handler: Results
+    Handler->>Kernel: Send response
+    Kernel->>NIC: Packet (DMA)
+    NIC->>Client: HTTP Response
+....
+
+== Key Components
+
+=== 1. Connection Management
+
+- **Connection pooling**: Reuse connections
+- **Keep-alive**: Persistent connections
+- **Backpressure**: Handle overload gracefully
+
+=== 2. Request Processing
+
+- **Routing**: Efficient path matching
+- **Middleware**: Pluggable processing pipeline
+- **Error handling**: Graceful error responses
+
+=== 3. Performance Features
+
+- **Zero-copy**: Minimize data copying
+- **Buffer management**: Efficient memory usage
+- **Caching**: Reduce redundant work
+
+=== 4. Monitoring & Observability
+
+- **Metrics**: Request rate, latency, errors
+- **Logging**: Structured logging
+- **Health checks**: Liveness and readiness
+
+== Implementation Strategy
+
+[mermaid, target=implementation-flow, format=svg]
+....
+graph LR
+    A[Socket Creation] --> B[Bind & Listen]
+    B --> C[Accept Loop]
+    C --> D{Architecture}
+    D -->|Thread| E[Thread Pool]
+    D -->|Process| F[Process Pool]
+    D -->|Async| G[Event Loop]
+    E --> H[Request Handler]
+    F --> H
+    G --> H
+    H --> I[Response]
+    I --> C
+....
+
+== Hands-On Examples
+
+=== Example 1: High-Performance HTTP Server (`01_http_server.py`)
+
+[source,python]
+----
+include::01_http_server.py[]
+----
+
+=== Example 2: Load Testing and Benchmarking (`02_load_testing.py`)
+
+[source,python]
+----
+include::02_load_testing.py[]
+----
+
+=== Example 3: Production Features (`03_production_features.py`)
+
+[source,python]
+----
+include::03_production_features.py[]
+----
+
+== Performance Optimization Techniques
+
+=== 1. Network Optimizations
+
+[cols="2,3,2", options="header"]
+|===
+|Technique |Description |Impact
+
+|TCP_NODELAY
+|Disable Nagle's algorithm
+|Lower latency
+
+|SO_REUSEADDR
+|Reuse socket addresses
+|Faster restart
+
+|Large buffers
+|Increase socket buffers
+|Higher throughput
+
+|Keep-alive
+|Reuse connections
+|Less overhead
+|===
+
+=== 2. Application Optimizations
+
+- **Request pipelining**: Process multiple requests
+- **Response compression**: Reduce bandwidth
+- **Static file caching**: Avoid disk I/O
+- **Connection limiting**: Prevent overload
+
+=== 3. System Optimizations
+
+- **File descriptor limits**: Increase ulimits
+- **TCP tuning**: Optimize kernel parameters
+- **CPU affinity**: Pin processes to cores
+- **NUMA awareness**: Memory locality
+
+== Monitoring Dashboard
+
+[mermaid, target=monitoring-dashboard, format=svg]
+....
+graph TD
+    subgraph "Metrics"
+        RPS[Requests/sec]
+        LAT[Latency P50/P95/P99]
+        ERR[Error Rate]
+        CONN[Active Connections]
+    end
+    
+    subgraph "Resources"
+        CPU[CPU Usage]
+        MEM[Memory Usage]
+        NET[Network I/O]
+        DISK[Disk I/O]
+    end
+    
+    subgraph "Health"
+        HC[Health Check]
+        READY[Readiness]
+        LIVE[Liveness]
+    end
+....
+
+== Production Checklist
+
+✅ **Graceful shutdown**: Clean connection closing
+
+✅ **Error recovery**: Handle failures gracefully
+
+✅ **Rate limiting**: Prevent abuse
+
+✅ **Access logging**: Audit trail
+
+✅ **Security headers**: CORS, CSP, etc.
+
+✅ **Connection limits**: Prevent resource exhaustion
+
+✅ **Timeout handling**: No hanging connections
+
+✅ **Metric collection**: Performance monitoring
+
+== Quick Exercise
+
+Build and test the servers:
+
+[source,bash]
+----
+# 1. Run the high-performance server
+python 01_http_server.py
+
+# 2. In another terminal, run load tests
+python 02_load_testing.py
+
+# 3. Explore production features
+python 03_production_features.py
+----
+
+== Key Takeaways
+
+✅ Choose architecture based on workload characteristics
+
+✅ Async excels for high-concurrency I/O workloads
+
+✅ Multiprocessing best for CPU-bound tasks
+
+✅ Threading good for moderate concurrency
+
+✅ Monitor and profile to identify bottlenecks
+
+✅ Production servers need robust error handling
+
+== Course Summary
+
+🎉 **Congratulations!** You've completed the journey from network packets to high-performance servers.
+
+**What you've learned:**
+
+1. **Module 1**: How network data travels from NIC to application
+2. **Module 2**: API request lifecycle and server architectures  
+3. **Module 3**: Threading and the GIL's impact
+4. **Module 4**: True parallelism with multiprocessing
+5. **Module 5**: Event-driven concurrency with async/await
+6. **Module 6**: User/kernel space and memory management
+7. **Module 7**: Advanced thread coordination
+8. **Module 8**: Building production-ready servers
+
+**Next steps:**
+
+- Experiment with different workloads
+- Profile your own applications
+- Explore advanced topics: io_uring, DPDK, kernel bypass
+- Build your own high-performance systems!
+
+== Resources
+
+- link:https://github.com/python/cpython[CPython Source Code]
+- link:https://docs.python.org/3/library/asyncio.html[Python Asyncio Documentation]
+- link:https://www.kernel.org/doc/html/latest/networking/[Linux Networking Documentation]
+- link:https://brendangregg.com/[Brendan Gregg's Performance Resources]

@@ -1,0 +1,202 @@
+= Python Systems Programming: From API Request to CPU Core
+:toc:
+:toc-placement!:
+:toclevels: 3
+
+image::https://img.shields.io/badge/Duration-30%20minutes-blue[]
+image::https://img.shields.io/badge/Level-Intermediate-orange[]
+image::https://img.shields.io/badge/Python-3.8+-green[]
+
+toc::[]
+
+== Course Overview
+
+This hands-on course demystifies how modern servers handle API requests using multiple cores, threads, and system-level operations. Through practical Python examples, you'll understand the journey of an HTTP request from network card to application response.
+
+=== What You'll Learn
+
+* How network packets travel from NIC to your application
+* The role of file descriptors and sockets in networking
+* User space vs kernel space operations and their performance impact
+* Multithreading vs multiprocessing vs async I/O
+* Thread management and synchronization primitives
+* Real-world patterns for building high-performance servers
+
+=== Prerequisites
+
+* Basic Python knowledge
+* Command line familiarity
+* Basic understanding of HTTP/REST APIs
+
+=== Course Structure
+
+[cols="1,3,1", options="header"]
+|===
+|Module |Topic |Duration
+
+|link:01-networking-basics/README.adoc[Module 1]
+|Networking Fundamentals: NICs, Sockets, and File Descriptors
+|4 min
+
+|link:02-api-lifecycle/README.adoc[Module 2]
+|API Request Lifecycle: From Network to Application
+|4 min
+
+|link:03-multithreading/README.adoc[Module 3]
+|Multithreading in Python: Concurrent Request Handling
+|4 min
+
+|link:04-multiprocessing/README.adoc[Module 4]
+|Multiprocessing: True Parallelism Across CPU Cores
+|4 min
+
+|link:05-async-io/README.adoc[Module 5]
+|Async I/O: Event-Driven Concurrency
+|4 min
+
+|link:06-memory-management/README.adoc[Module 6]
+|Memory Management: User Space vs Kernel Space
+|4 min
+
+|link:07-thread-management/README.adoc[Module 7]
+|Thread Management and Synchronization
+|3 min
+
+|link:08-putting-it-together/README.adoc[Module 8]
+|Building a High-Performance API Server
+|3 min
+|===
+
+== Quick Start
+
+[source,bash]
+----
+# Clone the repository
+git clone <repository-url>
+cd course
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start with Module 1
+cd 01-networking-basics
+python 01_socket_basics.py
+----
+
+== System Architecture Overview
+
+[mermaid, target=system-overview, format=svg]
+....
+graph TB
+    subgraph "Network Layer"
+        NIC[Network Interface Card]
+        KERNEL[Kernel Network Stack]
+    end
+    
+    subgraph "System Layer"
+        FD[File Descriptors]
+        SOCKET[Sockets]
+        EPOLL[Epoll/Select]
+    end
+    
+    subgraph "Application Layer"
+        PROCESS[Process]
+        THREADS[Threads]
+        ASYNC[Async Event Loop]
+    end
+    
+    subgraph "Hardware"
+        CPU1[CPU Core 1]
+        CPU2[CPU Core 2]
+        CPU3[CPU Core 3]
+        CPU4[CPU Core 4]
+    end
+    
+    NIC --> KERNEL
+    KERNEL --> FD
+    FD --> SOCKET
+    SOCKET --> EPOLL
+    EPOLL --> PROCESS
+    PROCESS --> THREADS
+    PROCESS --> ASYNC
+    THREADS --> CPU1
+    THREADS --> CPU2
+    ASYNC --> CPU3
+    PROCESS --> CPU4
+    
+    style NIC fill:#ff9999
+    style KERNEL fill:#ffcc99
+    style PROCESS fill:#99ccff
+    style CPU1 fill:#99ff99
+    style CPU2 fill:#99ff99
+    style CPU3 fill:#99ff99
+    style CPU4 fill:#99ff99
+....
+
+== Key Concepts Covered
+
+=== 🔌 Networking Stack
+* Network Interface Cards (NICs) and packet reception
+* Interrupt handling and DMA (Direct Memory Access)
+* Socket creation and file descriptor management
+* TCP/IP stack traversal
+
+=== 🔄 Concurrency Models
+* **Threading**: Shared memory, GIL limitations, I/O bound tasks
+* **Multiprocessing**: True parallelism, IPC overhead, CPU bound tasks
+* **Async I/O**: Event loops, coroutines, massive concurrency
+
+=== 💾 Memory Operations
+* User space vs kernel space separation
+* System calls and context switching costs
+* Zero-copy techniques
+* Buffer management strategies
+
+=== ⚡ Performance Considerations
+* Connection pooling
+* Load balancing across cores
+* Cache locality and NUMA awareness
+* Measuring and optimizing latency
+
+== Learning Path
+
+[mermaid, target=learning-path, format=svg]
+....
+graph LR
+    A[Start] --> B[Module 1: Networking Basics]
+    B --> C[Module 2: API Lifecycle]
+    C --> D{Choose Path}
+    D -->|Concurrency Focus| E[Module 3: Threading]
+    D -->|Performance Focus| F[Module 6: Memory Mgmt]
+    E --> G[Module 4: Multiprocessing]
+    F --> G
+    G --> H[Module 5: Async I/O]
+    H --> I[Module 7: Thread Mgmt]
+    I --> J[Module 8: Final Project]
+    J --> K[End]
+    
+    style A fill:#99ff99
+    style K fill:#ff9999
+    style D fill:#ffcc99
+....
+
+== Resources and References
+
+* link:https://docs.python.org/3/library/socket.html[Python Socket Programming]
+* link:https://docs.python.org/3/library/threading.html[Python Threading Documentation]
+* link:https://docs.python.org/3/library/multiprocessing.html[Python Multiprocessing Documentation]
+* link:https://docs.python.org/3/library/asyncio.html[Python Asyncio Documentation]
+* link:resources/glossary.adoc[Glossary of Terms]
+* link:resources/benchmarks.adoc[Performance Benchmarks]
+
+== Contributing
+
+Feel free to submit issues or pull requests to improve this course material.
+
+== License
+
+This course is provided under the MIT License.

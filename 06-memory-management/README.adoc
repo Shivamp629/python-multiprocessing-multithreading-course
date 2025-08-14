@@ -1,0 +1,434 @@
+= Module 6: Memory Management - User Space vs Kernel Space
+:toc:
+:toc-placement!:
+
+toc::[]
+
+== Overview
+
+This module explores the critical boundary between user space and kernel space, how data moves between them, and the performance implications of system calls and memory operations. Understanding this boundary is crucial for optimizing network applications.
+
+**Duration**: 4 minutes
+
+== Learning Objectives
+
+* Understand the user space/kernel space separation
+* Learn how system calls bridge the boundary
+* Explore memory copying costs and zero-copy techniques
+* Understand buffer management in network applications
+* Master memory profiling and optimization
+
+== Memory Architecture Overview
+
+[mermaid, target=memory-architecture, format=svg]
+....
+graph TD
+    subgraph "User Space (Ring 3)"
+        APP[Application Memory]
+        HEAP[Heap]
+        STACK[Stack]
+        LIBS[Shared Libraries]
+    end
+    
+    subgraph "Kernel Space (Ring 0)"
+        KSTACK[Kernel Stack]
+        KHEAP[Kernel Heap]
+        DRIVERS[Device Drivers]
+        NETSTACK[Network Stack]
+        FS[File System]
+        BUFFERS[Socket Buffers]
+    end
+    
+    subgraph "Hardware"
+        CPU[CPU]
+        MMU[Memory Management Unit]
+        RAM[Physical RAM]
+        NIC[Network Card]
+    end
+    
+    APP -.->|System Call| KSTACK
+    NETSTACK --> BUFFERS
+    BUFFERS -.->|copy_to_user| APP
+    APP -.->|copy_from_user| BUFFERS
+    
+    MMU --> RAM
+    CPU --> MMU
+    NIC --> DRIVERS
+    
+    style APP fill:#99ff99
+    style KSTACK fill:#ff9999
+    style MMU fill:#ffcc99
+....
+
+== System Call Flow
+
+[mermaid, target=syscall-flow, format=svg]
+....
+sequenceDiagram
+    participant User as User Process
+    participant CPU as CPU
+    participant Kernel as Kernel
+    participant Hardware as Hardware
+    
+    User->>CPU: System call (trap)
+    CPU->>CPU: Switch to Ring 0
+    CPU->>Kernel: Save user context
+    Kernel->>Kernel: Validate parameters
+    Kernel->>Hardware: Perform operation
+    Hardware-->>Kernel: Result
+    Kernel->>Kernel: Copy data to user
+    Kernel->>CPU: Restore user context
+    CPU->>CPU: Switch to Ring 3
+    CPU-->>User: Return result
+....
+
+== Memory Protection Rings
+
+[cols="1,2,3,2", options="header"]
+|===
+|Ring |Privilege |Access |Used By
+
+|Ring 0
+|Kernel mode
+|Full hardware access
+|Kernel, drivers
+
+|Ring 1
+|Reserved
+|Limited hardware
+|Rarely used
+
+|Ring 2
+|Reserved
+|Limited hardware
+|Rarely used
+
+|Ring 3
+|User mode
+|No direct hardware access
+|Applications
+|===
+
+== Cost of Crossing the Boundary
+
+=== System Call Overhead
+
+[cols="3,2,3", options="header"]
+|===
+|Operation |Typical Cost |Impact
+
+|Mode switch (user→kernel→user)
+|~100-300 ns
+|Context save/restore
+
+|Parameter validation
+|~50-100 ns
+|Security checks
+
+|Data copy (per KB)
+|~200-500 ns
+|Memory bandwidth
+
+|Cache effects
+|Variable
+|L1/L2 cache pollution
+
+|TLB flush (if needed)
+|~1000+ ns
+|Virtual memory overhead
+|===
+
+=== Network I/O Data Flow
+
+[mermaid, target=network-data-flow, format=svg]
+....
+graph LR
+    subgraph "Receiving Data"
+        NIC1[NIC Buffer] -->|DMA| KB1[Kernel Buffer]
+        KB1 -->|copy_to_user| UB1[User Buffer]
+    end
+    
+    subgraph "Sending Data"
+        UB2[User Buffer] -->|copy_from_user| KB2[Kernel Buffer]
+        KB2 -->|DMA| NIC2[NIC Buffer]
+    end
+    
+    style KB1 fill:#ff9999
+    style KB2 fill:#ff9999
+    style UB1 fill:#99ff99
+    style UB2 fill:#99ff99
+....
+
+== Memory Copy Operations
+
+=== Traditional I/O (Multiple Copies)
+
+1. **Read from network:**
+   - NIC → Kernel buffer (DMA)
+   - Kernel buffer → User buffer (CPU copy)
+
+2. **Write to disk:**
+   - User buffer → Kernel buffer (CPU copy)
+   - Kernel buffer → Disk (DMA)
+
+**Total: 2 CPU copies, significant overhead**
+
+=== Zero-Copy Techniques
+
+[mermaid, target=zero-copy, format=svg]
+....
+graph TD
+    subgraph "Traditional Copy"
+        TC_NIC[NIC] -->|DMA| TC_KB[Kernel Buffer]
+        TC_KB -->|CPU Copy| TC_UB[User Buffer]
+        TC_UB -->|CPU Copy| TC_KB2[Kernel Buffer]
+        TC_KB2 -->|DMA| TC_DISK[Disk]
+    end
+    
+    subgraph "Zero Copy (sendfile)"
+        ZC_NIC[NIC] -->|DMA| ZC_KB[Kernel Buffer]
+        ZC_KB -->|DMA| ZC_DISK[Disk]
+    end
+    
+    style TC_UB fill:#ff9999
+    style ZC_KB fill:#99ff99
+....
+
+== Buffer Management Strategies
+
+=== 1. Buffer Pooling
+
+Reuse allocated buffers to reduce allocation overhead.
+
+[source,python]
+----
+# Buffer pool pattern
+buffer_pool = []
+
+def get_buffer(size):
+    if buffer_pool:
+        return buffer_pool.pop()
+    return bytearray(size)
+
+def return_buffer(buf):
+    buffer_pool.append(buf)
+----
+
+=== 2. Ring Buffers
+
+Efficient for streaming data with minimal copying.
+
+[mermaid, target=ring-buffer, format=svg]
+....
+graph LR
+    subgraph "Ring Buffer"
+        B0[0] --> B1[1]
+        B1 --> B2[2]
+        B2 --> B3[3]
+        B3 --> B4[4]
+        B4 --> B5[5]
+        B5 --> B6[6]
+        B6 --> B7[7]
+        B7 --> B0
+        
+        READ[Read Ptr] -.-> B2
+        WRITE[Write Ptr] -.-> B5
+    end
+....
+
+=== 3. Memory-Mapped I/O
+
+Map files or devices directly into process memory.
+
+[source,python]
+----
+# Memory mapping example
+import mmap
+
+with open('large_file', 'r+b') as f:
+    # Map file into memory
+    mm = mmap.mmap(f.fileno(), 0)
+    # Direct memory access
+    data = mm[0:1024]
+----
+
+== Hands-On Examples
+
+=== Example 1: Memory Operations and System Calls (`01_memory_operations.py`)
+
+[source,python]
+----
+include::01_memory_operations.py[]
+----
+
+=== Example 2: Buffer Management Techniques (`02_buffer_management.py`)
+
+[source,python]
+----
+include::02_buffer_management.py[]
+----
+
+=== Example 3: Zero-Copy and Performance (`03_zero_copy.py`)
+
+[source,python]
+----
+include::03_zero_copy.py[]
+----
+
+== Performance Optimization Techniques
+
+=== 1. Minimize System Calls
+
+[cols="2,3,2", options="header"]
+|===
+|Technique |Description |Benefit
+
+|Batching
+|Group multiple operations
+|Fewer mode switches
+
+|Vectored I/O
+|readv/writev system calls
+|Single syscall for multiple buffers
+
+|io_uring (Linux)
+|Shared ring buffer with kernel
+|Minimal syscall overhead
+
+|Buffer reuse
+|Pool and reuse buffers
+|Reduced allocation overhead
+|===
+
+=== 2. Optimize Memory Access Patterns
+
+[mermaid, target=memory-access-patterns, format=svg]
+....
+graph TD
+    subgraph "Cache-Friendly"
+        CF[Sequential Access] --> CFL1[Cache Line 1]
+        CFL1 --> CFL2[Cache Line 2]
+        CFL2 --> CFL3[Cache Line 3]
+    end
+    
+    subgraph "Cache-Unfriendly"
+        CU[Random Access] --> CUL1[Line 1]
+        CU --> CUL5[Line 5]
+        CU --> CUL3[Line 3]
+        CU --> CUL7[Line 7]
+    end
+    
+    style CF fill:#99ff99
+    style CU fill:#ff9999
+....
+
+=== 3. NUMA Awareness
+
+On multi-socket systems, memory locality matters:
+
+[source,python]
+----
+# NUMA-aware allocation (conceptual)
+# Allocate memory on same NUMA node as CPU
+cpu_node = get_cpu_numa_node()
+memory = allocate_on_numa_node(size, cpu_node)
+----
+
+== Memory Profiling Tools
+
+=== Python Memory Profilers
+
+1. **memory_profiler**: Line-by-line memory usage
+2. **tracemalloc**: Built-in memory tracking
+3. **pympler**: Advanced memory analysis
+4. **objgraph**: Object reference graphs
+
+=== System Tools
+
+1. **vmstat**: Virtual memory statistics
+2. **perf**: CPU and memory performance
+3. **strace**: System call tracing
+4. **tcpdump**: Network packet capture
+
+== Best Practices
+
+=== 1. Buffer Right-Sizing
+
+[source,python]
+----
+# Bad: Fixed large buffers
+buffer = bytearray(1024 * 1024)  # Always 1MB
+
+# Good: Dynamic sizing
+buffer = bytearray(min(needed_size, MAX_BUFFER_SIZE))
+----
+
+=== 2. Avoid Unnecessary Copies
+
+[source,python]
+----
+# Bad: Multiple string concatenations
+result = ""
+for chunk in chunks:
+    result += chunk  # Creates new string each time
+
+# Good: Use join or bytearray
+result = ''.join(chunks)
+# or
+buffer = bytearray()
+for chunk in chunks:
+    buffer.extend(chunk)
+----
+
+=== 3. Use Views Instead of Copies
+
+[source,python]
+----
+# Bad: Slice creates copy
+data = large_buffer[1000:2000].copy()
+
+# Good: Memory view (no copy)
+view = memoryview(large_buffer)[1000:2000]
+----
+
+== Quick Exercise
+
+Run the examples to explore memory management:
+
+[source,bash]
+----
+# 1. Understand system calls and memory operations
+python 01_memory_operations.py
+
+# 2. Compare buffer management strategies
+python 02_buffer_management.py
+
+# 3. Explore zero-copy techniques
+python 03_zero_copy.py
+----
+
+== Key Takeaways
+
+✅ User/kernel space boundary crossing is expensive
+
+✅ System calls have significant overhead (~100-300ns)
+
+✅ Data copying between spaces adds latency
+
+✅ Zero-copy techniques can dramatically improve performance
+
+✅ Buffer management strategies affect memory usage and speed
+
+✅ Cache-friendly access patterns improve performance
+
+== Common Pitfalls
+
+1. **Excessive system calls**: Batch operations when possible
+2. **Large buffer copies**: Use views or zero-copy techniques
+3. **Memory leaks**: Properly manage buffer lifecycles
+4. **Cache thrashing**: Consider memory access patterns
+5. **Ignoring NUMA**: Memory locality matters on large systems
+
+== Next Module
+
+link:../07-thread-management/README.adoc[Module 7: Thread Management] - Advanced synchronization and coordination

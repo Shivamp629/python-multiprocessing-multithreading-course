@@ -1,0 +1,397 @@
+= Module 4: Multiprocessing in Python
+:toc:
+:toc-placement!:
+
+toc::[]
+
+== Overview
+
+This module explores Python's multiprocessing capabilities for achieving true parallelism. Unlike threading, multiprocessing creates separate Python processes, each with its own GIL, enabling genuine concurrent execution on multiple CPU cores.
+
+**Duration**: 4 minutes
+
+== Learning Objectives
+
+* Understand process creation and management
+* Learn inter-process communication (IPC) mechanisms
+* Master process pools for parallel computation
+* Understand shared memory and synchronization
+* Compare multiprocessing performance with threading
+
+== Process vs Thread Architecture
+
+[mermaid, target=process-vs-thread, format=svg]
+....
+graph TD
+    subgraph "Threading (Single Process)"
+        GIL1[GIL]
+        T1[Thread 1]
+        T2[Thread 2]
+        T3[Thread 3]
+        MEM1[Shared Memory]
+        
+        T1 --> GIL1
+        T2 --> GIL1
+        T3 --> GIL1
+        T1 --> MEM1
+        T2 --> MEM1
+        T3 --> MEM1
+    end
+    
+    subgraph "Multiprocessing"
+        subgraph "Process 1"
+            GIL_P1[GIL]
+            P1[Python Interpreter]
+            MEM_P1[Memory Space]
+        end
+        
+        subgraph "Process 2"
+            GIL_P2[GIL]
+            P2[Python Interpreter]
+            MEM_P2[Memory Space]
+        end
+        
+        subgraph "Process 3"
+            GIL_P3[GIL]
+            P3[Python Interpreter]
+            MEM_P3[Memory Space]
+        end
+        
+        IPC[IPC: Pipes/Queues/Shared Memory]
+        
+        MEM_P1 -.-> IPC
+        MEM_P2 -.-> IPC
+        MEM_P3 -.-> IPC
+    end
+    
+    style GIL1 fill:#ff9999
+    style GIL_P1 fill:#99ff99
+    style GIL_P2 fill:#99ff99
+    style GIL_P3 fill:#99ff99
+....
+
+== Key Differences from Threading
+
+[cols="2,3,3", options="header"]
+|===
+|Aspect |Threading |Multiprocessing
+
+|Memory
+|Shared memory space
+|Separate memory per process
+
+|GIL Impact
+|Limited by single GIL
+|Each process has own GIL
+
+|Communication
+|Direct memory access
+|IPC mechanisms required
+
+|Creation Overhead
+|~100-500 μs
+|~10-100 ms
+
+|Context Switch
+|~1-10 μs
+|~10-100 μs
+
+|Best For
+|I/O-bound tasks
+|CPU-bound tasks
+|===
+
+== Inter-Process Communication (IPC)
+
+=== 1. Pipes
+
+Simple unidirectional or bidirectional communication.
+
+[mermaid, target=pipe-communication, format=svg]
+....
+sequenceDiagram
+    participant P1 as Process 1
+    participant Pipe
+    participant P2 as Process 2
+    
+    P1->>Pipe: send(data)
+    Pipe->>P2: recv() → data
+    P2->>Pipe: send(result)
+    Pipe->>P1: recv() → result
+....
+
+=== 2. Queues
+
+Thread-safe FIFO communication.
+
+[mermaid, target=queue-communication, format=svg]
+....
+graph LR
+    P1[Producer 1] -->|put| Q[Queue]
+    P2[Producer 2] -->|put| Q
+    Q -->|get| C1[Consumer 1]
+    Q -->|get| C2[Consumer 2]
+    Q -->|get| C3[Consumer 3]
+....
+
+=== 3. Shared Memory
+
+Direct memory sharing with synchronization.
+
+[mermaid, target=shared-memory, format=svg]
+....
+graph TD
+    subgraph "Shared Memory"
+        MEM[Shared Array/Value]
+        LOCK[Lock/Semaphore]
+    end
+    
+    P1[Process 1] -->|read/write| MEM
+    P2[Process 2] -->|read/write| MEM
+    P3[Process 3] -->|read/write| MEM
+    
+    P1 -.->|acquire| LOCK
+    P2 -.->|acquire| LOCK
+    P3 -.->|acquire| LOCK
+....
+
+== Process Lifecycle
+
+[mermaid, target=process-lifecycle, format=svg]
+....
+stateDiagram-v2
+    [*] --> Created: Process()
+    Created --> Started: start()
+    Started --> Running: OS schedules
+    Running --> Waiting: I/O or synchronization
+    Waiting --> Running: Resume
+    Running --> Terminated: exit or exception
+    Terminated --> Zombie: Waiting for join()
+    Zombie --> [*]: Parent calls join()
+....
+
+== Multiprocessing Patterns
+
+=== 1. Fork-Join Pattern
+
+Split work among processes and combine results.
+
+[source,python]
+----
+# Fork
+processes = []
+for i in range(num_workers):
+    p = Process(target=worker, args=(chunk[i],))
+    p.start()
+    processes.append(p)
+
+# Join
+for p in processes:
+    p.join()
+----
+
+=== 2. Producer-Consumer Pattern
+
+Processes communicate through queues.
+
+[source,python]
+----
+def producer(queue):
+    for item in generate_items():
+        queue.put(item)
+
+def consumer(queue):
+    while True:
+        item = queue.get()
+        if item is None:  # Sentinel
+            break
+        process(item)
+----
+
+=== 3. Map-Reduce Pattern
+
+Parallel map operation followed by reduction.
+
+[source,python]
+----
+with Pool() as pool:
+    # Map phase
+    results = pool.map(process_function, data)
+    # Reduce phase
+    final_result = reduce(combine_function, results)
+----
+
+== Hands-On Examples
+
+=== Example 1: Basic Multiprocessing (`01_multiprocessing_basics.py`)
+
+[source,python]
+----
+include::01_multiprocessing_basics.py[]
+----
+
+=== Example 2: Inter-Process Communication (`02_ipc_mechanisms.py`)
+
+[source,python]
+----
+include::02_ipc_mechanisms.py[]
+----
+
+=== Example 3: Process Pool Patterns (`03_process_pools.py`)
+
+[source,python]
+----
+include::03_process_pools.py[]
+----
+
+== Performance Characteristics
+
+=== Process Creation Overhead
+
+[cols="3,2,3", options="header"]
+|===
+|Operation |Typical Time |Notes
+
+|Process creation (fork)
+|~1-5 ms
+|Copy-on-write on Unix
+
+|Process creation (spawn)
+|~10-50 ms
+|Full interpreter start
+
+|Process termination
+|~1-10 ms
+|Resource cleanup
+
+|IPC Queue put/get
+|~10-50 μs
+|Serialization overhead
+
+|Shared memory access
+|~0.1-1 μs
+|Direct memory access
+|===
+
+=== Multiprocessing vs Threading Performance
+
+[cols="3,2,2,3", options="header"]
+|===
+|Task Type |Threading |Multiprocessing |Winner
+
+|CPU-bound (pure Python)
+|1.0x
+|3.5x
+|Multiprocessing
+
+|NumPy operations
+|3.8x
+|3.9x
+|Similar (both release GIL)
+
+|I/O-bound
+|4.0x
+|3.0x
+|Threading (less overhead)
+
+|Mixed CPU/IO
+|2.0x
+|3.0x
+|Multiprocessing
+|===
+
+== Best Practices
+
+=== 1. Use Process Pools
+
+[source,python]
+----
+# Good: Reuse processes
+with ProcessPoolExecutor(max_workers=cpu_count()) as executor:
+    results = executor.map(cpu_bound_task, data)
+
+# Bad: Create new process for each task
+for item in data:
+    p = Process(target=cpu_bound_task, args=(item,))
+    p.start()
+----
+
+=== 2. Minimize IPC Overhead
+
+[source,python]
+----
+# Good: Send batches
+queue.put(large_batch)
+
+# Bad: Send individual items
+for item in large_batch:
+    queue.put(item)
+----
+
+=== 3. Use Appropriate Start Method
+
+[source,python]
+----
+# Fork (Unix only, fast but can cause issues)
+multiprocessing.set_start_method('fork')
+
+# Spawn (cross-platform, slower but safer)
+multiprocessing.set_start_method('spawn')
+
+# Forkserver (Unix, balance of speed and safety)
+multiprocessing.set_start_method('forkserver')
+----
+
+=== 4. Handle Process Cleanup
+
+[source,python]
+----
+# Good: Always join or use context manager
+with Pool() as pool:
+    results = pool.map(func, data)
+
+# Bad: Orphaned processes
+pool = Pool()
+results = pool.map(func, data)
+# No cleanup!
+----
+
+== Common Pitfalls
+
+1. **Pickling overhead**: All data must be serializable
+2. **Memory usage**: Each process has full copy of data
+3. **Startup cost**: Process creation is expensive
+4. **Debugging difficulty**: Harder than threading
+5. **Platform differences**: Fork vs spawn behavior
+
+== Quick Exercise
+
+Run the examples to explore multiprocessing:
+
+[source,bash]
+----
+# 1. Compare process vs thread performance
+python 01_multiprocessing_basics.py
+
+# 2. Explore IPC mechanisms
+python 02_ipc_mechanisms.py
+
+# 3. Test process pool patterns
+python 03_process_pools.py
+----
+
+== Key Takeaways
+
+✅ Multiprocessing enables true parallel execution on multiple cores
+
+✅ Each process has its own memory space and GIL
+
+✅ IPC mechanisms have overhead but enable safe communication
+
+✅ Process pools minimize creation overhead
+
+✅ Best suited for CPU-bound tasks that can be parallelized
+
+== Next Module
+
+link:../05-async-io/README.adoc[Module 5: Async I/O] - Event-driven concurrency with async/await

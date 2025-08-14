@@ -1,0 +1,315 @@
+= Performance Benchmarks Reference
+
+== System Call Overhead
+
+[cols="2,2,3", options="header"]
+|===
+|Operation |Typical Latency |Notes
+
+|getpid()
+|~100-300 ns
+|Minimal system call
+
+|read() (small)
+|~500 ns - 1 μs
+|Depends on buffer size
+
+|write() (small)
+|~500 ns - 1 μs
+|Depends on buffer size
+
+|socket()
+|~1-5 μs
+|Creates file descriptor
+
+|accept()
+|~2-10 μs
+|New connection
+
+|Context switch
+|~1-10 μs
+|Thread to thread
+
+|Process fork
+|~100 μs - 1 ms
+|Copy-on-write helps
+|===
+
+== Memory Operations
+
+[cols="2,2,3", options="header"]
+|===
+|Operation |Bandwidth |Notes
+
+|L1 Cache
+|~100 GB/s
+|~1 cycle latency
+
+|L2 Cache
+|~50 GB/s
+|~4 cycle latency
+
+|L3 Cache
+|~30 GB/s
+|~12 cycle latency
+
+|Main Memory
+|~20-50 GB/s
+|~100 cycle latency
+
+|memcpy (large)
+|~10-30 GB/s
+|CPU dependent
+
+|Page fault
+|~10-100 μs
+|If page on disk: ms
+|===
+
+== Network Operations
+
+[cols="2,2,3", options="header"]
+|===
+|Operation |Latency |Notes
+
+|Loopback ping
+|~20-50 μs
+|Same machine
+
+|LAN ping
+|~0.1-1 ms
+|Local network
+
+|Internet ping
+|~10-100 ms
+|Geographic dependent
+
+|TCP handshake
+|1.5 * RTT
+|3-way handshake
+
+|TLS handshake
+|2-4 * RTT
+|Certificate validation
+
+|HTTP request
+|1+ RTT
+|Plus processing time
+|===
+
+== Concurrency Models
+
+[cols="3,2,2,2", options="header"]
+|===
+|Model |Max Connections |Memory/Connection |CPU Efficiency
+
+|Thread per connection
+|~1,000
+|~1-8 MB
+|Poor (GIL)
+
+|Process per connection
+|~100
+|~10-50 MB
+|Good
+
+|Event-driven (async)
+|~100,000
+|~10-50 KB
+|Good for I/O
+
+|Thread pool
+|~10,000
+|~100 KB
+|Moderate
+
+|Process pool
+|~1,000
+|~1-10 MB
+|Excellent
+|===
+
+== Python-Specific
+
+[cols="2,2,3", options="header"]
+|===
+|Operation |Time |Notes
+
+|Function call
+|~50-100 ns
+|Python overhead
+
+|Thread creation
+|~100-500 μs
+|OS thread
+
+|Process creation (fork)
+|~1-5 ms
+|Unix only
+
+|Process creation (spawn)
+|~10-50 ms
+|Cross-platform
+
+|Coroutine creation
+|~1 μs
+|Lightweight
+
+|asyncio.sleep(0)
+|~5-20 μs
+|Yield to event loop
+
+|GIL switch interval
+|5 ms
+|Default setting
+|===
+
+== I/O Patterns
+
+[cols="3,2,2", options="header"]
+|===
+|Pattern |Throughput |Best For
+
+|Synchronous I/O
+|~1K req/s
+|Simple apps
+
+|Threading
+|~10K req/s
+|Moderate concurrency
+
+|Async I/O
+|~100K req/s
+|High concurrency
+
+|Multiprocessing
+|~10K req/s
+|CPU-bound
+
+|io_uring (Linux)
+|~1M req/s
+|Extreme performance
+|===
+
+== Real-World Expectations
+
+[cols="3,2,3", options="header"]
+|===
+|Application Type |Typical RPS |Limiting Factors
+
+|Simple web app
+|100-1K
+|Database queries
+
+|API service
+|1K-10K
+|Business logic
+
+|Static file server
+|10K-100K
+|Disk I/O
+
+|WebSocket server
+|10K-100K connections
+|Memory
+
+|Cache server
+|100K-1M
+|Network bandwidth
+
+|Load balancer
+|10K-100K
+|CPU
+|===
+
+== Optimization Impact
+
+[cols="3,2,3", options="header"]
+|===
+|Optimization |Typical Improvement |Applicable To
+
+|Connection pooling
+|2-10x
+|Database/HTTP clients
+
+|Caching
+|10-100x
+|Repeated computations
+
+|Zero-copy
+|2-5x
+|Large data transfers
+
+|Batch operations
+|5-50x
+|Multiple small ops
+
+|Async I/O
+|10-100x
+|I/O-bound tasks
+
+|Protocol buffers
+|2-10x
+|vs JSON
+
+|Memory pooling
+|2-5x
+|Frequent allocations
+|===
+
+== Hardware Considerations
+
+[cols="2,2,3", options="header"]
+|===
+|Resource |Impact |Optimization
+
+|CPU cores
+|Linear scaling
+|Multiprocessing
+
+|CPU cache
+|10-100x latency
+|Data locality
+
+|RAM bandwidth
+|Throughput limit
+|NUMA awareness
+
+|Network card
+|Packet rate limit
+|Kernel bypass
+
+|SSD vs HDD
+|100x latency
+|I/O patterns
+
+|10Gb vs 1Gb NIC
+|10x bandwidth
+|Large transfers
+|===
+
+== Rules of Thumb
+
+1. **Latency Budget**: For 100ms response time:
+   - Network RTT: 20-50ms
+   - Backend processing: 20-50ms  
+   - Database queries: 10-30ms
+   - Serialization: 1-5ms
+
+2. **Concurrency Limits**:
+   - Threads: 100-1000 per process
+   - Processes: 10-100 per machine
+   - Connections: 10K-1M per server
+   - File descriptors: Default 1024, can increase
+
+3. **Memory Requirements**:
+   - Thread stack: 1-8 MB
+   - Process overhead: 10-50 MB
+   - Connection state: 10-100 KB
+   - Request buffer: 4-64 KB
+
+4. **Performance Targets**:
+   - API latency: < 100ms (p95)
+   - Static files: < 10ms
+   - Database query: < 50ms
+   - Cache hit: < 1ms

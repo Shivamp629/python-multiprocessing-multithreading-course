@@ -1,0 +1,131 @@
+= Glossary of Terms
+
+== A
+
+**Accept Queue**:: The queue of pending connections waiting to be accepted by the server.
+
+**Async/Await**:: Python syntax for asynchronous programming using coroutines.
+
+**Atomic Operation**:: An operation that completes in a single step without possibility of interruption.
+
+== B
+
+**Backlog**:: Maximum number of pending connections in the accept queue.
+
+**Barrier**:: Synchronization primitive that blocks threads until all have reached a certain point.
+
+**Buffer**:: Temporary storage area for data being transferred between locations.
+
+== C
+
+**Context Switch**:: The process of saving and restoring CPU state when switching between threads/processes.
+
+**Coroutine**:: A function that can be paused and resumed, used in async programming.
+
+**Copy-on-Write (COW)**:: Optimization where memory pages are shared until modified.
+
+**Critical Section**:: Code that must be executed by only one thread at a time.
+
+== D
+
+**Deadlock**:: Situation where threads are blocked forever waiting for each other.
+
+**DMA (Direct Memory Access)**:: Hardware feature allowing devices to access memory without CPU.
+
+== E
+
+**Event Loop**:: Core component that schedules and executes async tasks.
+
+**Epoll**:: Linux system call for scalable I/O event notification.
+
+== F
+
+**File Descriptor**:: Integer that uniquely identifies an open file or socket.
+
+**Fork**:: System call that creates a new process by copying the current one.
+
+== G
+
+**GIL (Global Interpreter Lock)**:: Mutex that protects Python objects from concurrent access.
+
+**Green Thread**:: User-space thread managed by runtime rather than OS.
+
+== I
+
+**Inter-Process Communication (IPC)**:: Mechanisms for processes to communicate and share data.
+
+**Interrupt**:: Signal to CPU that an event needs immediate attention.
+
+== K
+
+**Kernel Space**:: Protected memory area where the OS kernel executes.
+
+**Keep-Alive**:: HTTP feature to reuse TCP connections for multiple requests.
+
+== L
+
+**Lock**:: Synchronization primitive ensuring mutual exclusion.
+
+**Livelock**:: Threads actively trying to resolve conflict but making no progress.
+
+== M
+
+**Memory Mapping**:: Technique to map files or devices into process memory space.
+
+**Mutex**:: Mutual exclusion lock, same as Lock.
+
+== N
+
+**NIC (Network Interface Card)**:: Hardware component for network communication.
+
+**Non-blocking I/O**:: I/O operations that return immediately without waiting.
+
+== P
+
+**Page Fault**:: Exception when program accesses memory page not in RAM.
+
+**Pipeline**:: Pattern where data flows through sequential processing stages.
+
+**Process**:: Independent program execution with its own memory space.
+
+== Q
+
+**Queue**:: FIFO data structure for thread-safe communication.
+
+== R
+
+**Race Condition**:: Bug occurring when program behavior depends on timing.
+
+**Ring Buffer**:: Circular buffer that wraps around when full.
+
+**RLock**:: Reentrant lock that can be acquired multiple times by same thread.
+
+== S
+
+**Semaphore**:: Synchronization primitive controlling access to limited resources.
+
+**Socket**:: Endpoint for network communication.
+
+**Spawn**:: Method of creating new process with fresh interpreter.
+
+**System Call**:: Request from user program to kernel for OS services.
+
+== T
+
+**Thread**:: Lightweight execution unit sharing process memory.
+
+**Thread Local Storage (TLS)**:: Per-thread storage isolated from other threads.
+
+**Throughput**:: Rate of successful message delivery (requests/second).
+
+== U
+
+**User Space**:: Memory area where user applications execute.
+
+== V
+
+**Virtual Memory**:: Memory management providing abstract address space.
+
+== Z
+
+**Zero-Copy**:: Techniques avoiding unnecessary data copying between memory areas.
