@@ -1,11 +1,36 @@
 # Core dependencies for the Python Systems Programming course
+
+# Web Framework (Module 9)
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# Async libraries
 aiohttp==3.9.1
+httpx==0.24.1
 aiofiles==23.2.1
+anyio==4.0.0
+
+# Database
+databases==0.8.0
+sqlalchemy==2.0.23
+aiosqlite==0.19.0
+asyncpg==0.29.0
+
+# System monitoring
 psutil==5.9.6
+prometheus-client==0.19.0
+
+# Sync HTTP for comparison
 requests==2.31.0
+
+# Performance
 uvloop==0.19.0
 numpy==1.26.2
+
+# Visualization
 matplotlib==3.8.2
+rich==13.4.2
 
 # Development dependencies
 pytest==7.4.3

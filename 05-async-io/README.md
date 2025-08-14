@@ -1,0 +1,334 @@
+# Module 5: Async I/O - Event-Driven Concurrency
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Learning Objectives](#learning-objectives)
+- [How Async I/O Works](#how-async-io-works)
+- [Event Loop Lifecycle](#event-loop-lifecycle)
+- [Async vs Sync vs Threading](#async-vs-sync-vs-threading)
+- [Core Async Concepts](#core-async-concepts)
+- [Common Async Patterns](#common-async-patterns)
+- [Hands-On Examples](#hands-on-examples)
+- [Performance Characteristics](#performance-characteristics)
+- [Best Practices](#best-practices)
+- [Common Pitfalls](#common-pitfalls)
+- [Quick Exercise](#quick-exercise)
+- [Key Takeaways](#key-takeaways)
+- [When to Use What?](#when-to-use-what)
+- [Next Module](#next-module)
+
+## Overview
+
+This module explores asynchronous programming in Python using async/await. Unlike threading or multiprocessing, async I/O uses a single-threaded event loop to handle thousands of concurrent operations efficiently, making it ideal for I/O-bound tasks.
+
+**Duration**: 4 minutes
+
+## Learning Objectives
+
+* Understand event loops and coroutines
+* Master async/await syntax and patterns
+* Learn when to use async vs threading vs multiprocessing
+* Handle concurrent HTTP requests and database operations
+* Understand async context managers and iterators
+
+## How Async I/O Works
+
+```mermaid
+graph TD
+    subgraph "Single Thread"
+        EL[Event Loop]
+        
+        subgraph "Coroutines"
+            C1[Coroutine 1]
+            C2[Coroutine 2]
+            C3[Coroutine 3]
+            C4[Coroutine 4]
+        end
+        
+        subgraph "I/O Operations"
+            IO1[Network I/O]
+            IO2[Disk I/O]
+            IO3[Database Query]
+        end
+    end
+    
+    EL -->|schedules| C1
+    EL -->|schedules| C2
+    EL -->|schedules| C3
+    EL -->|schedules| C4
+    
+    C1 -.->|await| IO1
+    C2 -.->|await| IO2
+    C3 -.->|await| IO3
+    C4 -.->|await| IO1
+    
+    IO1 -->|complete| EL
+    IO2 -->|complete| EL
+    IO3 -->|complete| EL
+    
+    style EL fill:#ff9999
+    style C1 fill:#99ff99
+    style C2 fill:#99ff99
+```
+
+## Event Loop Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> Created: asyncio.new_event_loop()
+    Created --> Running: loop.run_until_complete()
+    Running --> Scheduling: Schedule coroutines
+    Scheduling --> Executing: Execute coroutine
+    Executing --> Waiting: await I/O
+    Waiting --> Ready: I/O complete
+    Ready --> Executing: Resume coroutine
+    Executing --> Complete: Coroutine done
+    Complete --> Scheduling: More tasks?
+    Scheduling --> Stopped: No more tasks
+    Stopped --> [*]: loop.close()
+```
+
+## Async vs Sync vs Threading
+
+| Aspect | Synchronous | Threading | Async I/O |
+|--------|-------------|-----------|-----------|
+| Concurrency Model | Sequential execution | Preemptive multitasking | Cooperative multitasking |
+| Best For | Simple scripts | I/O with blocking APIs | I/O with async APIs |
+| Overhead | None | Thread creation/switching | Minimal (coroutine switching) |
+| Scalability | Poor (blocking) | Limited (~1000s threads) | Excellent (~100,000s tasks) |
+| Complexity | Simple | Moderate (race conditions) | Moderate (async thinking) |
+| CPU Bound Tasks | Good | Limited by GIL | Poor |
+| I/O Bound Tasks | Poor | Good | Excellent |
+
+## Core Async Concepts
+
+### 1. Coroutines
+
+Functions defined with `async def` that can be paused and resumed.
+
+```python
+async def fetch_data(url):
+    # This is a coroutine
+    response = await http_get(url)  # Pause here
+    return response.json()           # Resume here
+```
+
+### 2. Tasks
+
+Wrapped coroutines scheduled for execution.
+
+```python
+# Create tasks for concurrent execution
+task1 = asyncio.create_task(coroutine1())
+task2 = asyncio.create_task(coroutine2())
+
+# Wait for both
+results = await asyncio.gather(task1, task2)
+```
+
+### 3. Event Loop
+
+The core that schedules and executes coroutines.
+
+```python
+# Get or create event loop
+loop = asyncio.get_event_loop()
+
+# Run coroutine
+result = loop.run_until_complete(main())
+
+# Or simpler in Python 3.7+
+result = asyncio.run(main())
+```
+
+### 4. Awaitable Objects
+
+Objects that can be used with `await`:
+- Coroutines
+- Tasks
+- Futures
+- Objects with `__await__` method
+
+## Common Async Patterns
+
+```mermaid
+graph LR
+    subgraph "Concurrent Execution"
+        A[Start] --> B[Create Tasks]
+        B --> C[gather/wait]
+        C --> D[All Complete]
+    end
+    
+    subgraph "Sequential Execution"
+        E[Start] --> F[await task1]
+        F --> G[await task2]
+        G --> H[await task3]
+        H --> I[Complete]
+    end
+    
+    subgraph "Fire and Forget"
+        J[Start] --> K[create_task]
+        K --> L[Continue]
+        K -.-> M[Task runs independently]
+    end
+```
+
+## Hands-On Examples
+
+### Example 1: Async Basics (`01_async_basics.py`)
+
+```python
+# Learn async fundamentals
+python 01_async_basics.py
+```
+
+### Example 2: Concurrent I/O Operations (`02_concurrent_io.py`)
+
+```python
+# Handle concurrent I/O efficiently
+python 02_concurrent_io.py
+```
+
+### Example 3: Async Patterns and Best Practices (`03_async_patterns.py`)
+
+```python
+# Master advanced async patterns
+python 03_async_patterns.py
+```
+
+## Performance Characteristics
+
+### Async Operation Overhead
+
+| Operation | Typical Time | Notes |
+|-----------|--------------|-------|
+| Coroutine creation | ~0.1-1 μs | Minimal overhead |
+| Task creation | ~1-5 μs | Slightly more than coroutine |
+| Context switch (await) | ~0.1-0.5 μs | Much faster than thread switch |
+| Event loop iteration | ~1-10 μs | Depends on ready tasks |
+| asyncio.sleep(0) | ~5-20 μs | Yields to event loop |
+
+### Concurrency Comparison
+
+| Scenario | Sync | Threading | Async | Winner |
+|----------|------|-----------|-------|---------|
+| 1000 HTTP requests | 1000s | 50s | 2s | Async |
+| Heavy computation | 10s | 10s | 10s | Tie (use multiprocessing) |
+| Mixed I/O and CPU | 100s | 20s | 15s | Async |
+| Database queries | 60s | 10s | 3s | Async |
+| File I/O (with aiofiles) | 30s | 8s | 5s | Async |
+
+## Best Practices
+
+### 1. Don't Block the Event Loop
+
+```python
+# Bad: Blocks event loop
+async def bad_handler():
+    time.sleep(1)  # BLOCKS!
+    data = compute_heavy()  # BLOCKS!
+
+# Good: Use async alternatives
+async def good_handler():
+    await asyncio.sleep(1)
+    data = await run_in_executor(compute_heavy)
+```
+
+### 2. Gather for Concurrent Execution
+
+```python
+# Bad: Sequential
+result1 = await fetch_data(url1)
+result2 = await fetch_data(url2)
+result3 = await fetch_data(url3)
+
+# Good: Concurrent
+results = await asyncio.gather(
+    fetch_data(url1),
+    fetch_data(url2),
+    fetch_data(url3)
+)
+```
+
+### 3. Use Async Context Managers
+
+```python
+# Good: Ensures cleanup
+async with aiohttp.ClientSession() as session:
+    async with session.get(url) as response:
+        data = await response.json()
+```
+
+### 4. Handle Exceptions Properly
+
+```python
+# Handle exceptions in gathered tasks
+results = await asyncio.gather(
+    task1(), task2(), task3(),
+    return_exceptions=True
+)
+
+for result in results:
+    if isinstance(result, Exception):
+        print(f"Task failed: {result}")
+```
+
+## Common Pitfalls
+
+1. **Forgetting await**: Coroutines must be awaited
+2. **Blocking operations**: Using `time.sleep()` instead of `asyncio.sleep()`
+3. **Synchronous libraries**: Not all libraries have async versions
+4. **Creating too many tasks**: Can overwhelm the event loop
+5. **Not closing resources**: Always use async context managers
+
+## Quick Exercise
+
+Run the examples to explore async I/O:
+
+```bash
+# 1. Learn async basics
+python 01_async_basics.py
+
+# 2. See concurrent I/O performance
+python 02_concurrent_io.py
+
+# 3. Explore advanced patterns
+python 03_async_patterns.py
+```
+
+## Key Takeaways
+
+✅ Async I/O excels at handling many concurrent I/O operations
+
+✅ Single thread means no race conditions (but still need synchronization)
+
+✅ Event loop schedules coroutines cooperatively
+
+✅ Much lower overhead than threads for I/O tasks
+
+✅ Not suitable for CPU-bound tasks
+
+## When to Use What?
+
+```mermaid
+graph TD
+    A[Task Type?] --> B{I/O Bound?}
+    B -->|Yes| C{Async API Available?}
+    C -->|Yes| D[Use Async I/O]
+    C -->|No| E{Many Operations?}
+    E -->|Yes| F[Use Threading]
+    E -->|No| G[Use Synchronous]
+    B -->|No| H{CPU Bound?}
+    H -->|Yes| I{Parallelizable?}
+    I -->|Yes| J[Use Multiprocessing]
+    I -->|No| K[Optimize Algorithm]
+    
+    style D fill:#99ff99
+    style F fill:#99ccff
+    style J fill:#ffcc99
+```
+
+## Next Module
+
+[Module 6: Memory Management](../06-memory-management/README.md) - Understanding user space vs kernel space operations

@@ -1,0 +1,278 @@
+# Module 2: API Request Lifecycle
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Learning Objectives](#learning-objectives)
+- [HTTP Request Lifecycle](#http-request-lifecycle)
+- [Connection Handling Models](#connection-handling-models)
+- [Hands-On Examples](#hands-on-examples)
+- [Performance Characteristics](#performance-characteristics)
+- [System Calls in Action](#system-calls-in-action)
+- [Quick Exercise](#quick-exercise)
+- [Key Takeaways](#key-takeaways)
+- [Next Module](#next-module)
+
+## Overview
+
+This module traces the complete journey of an HTTP API request from the moment it arrives at the server to when the response is sent back. We'll explore how web servers handle concurrent requests and the role of the operating system in managing connections.
+
+**Duration**: 4 minutes
+
+## Learning Objectives
+
+* Understand the complete lifecycle of an HTTP request
+* Learn how web servers accept and process connections
+* Explore connection handling models (threading, forking, event-driven)
+* Understand the role of the kernel in managing network I/O
+
+## HTTP Request Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant NIC as Network Card
+    participant Kernel
+    participant Server as Web Server
+    participant Worker as Worker Thread/Process
+    participant App as Application Code
+    
+    Client->>NIC: HTTP Request
+    NIC->>Kernel: Interrupt + DMA
+    Kernel->>Kernel: TCP/IP Processing
+    Kernel->>Server: Data available on socket
+    
+    Server->>Kernel: accept() new connection
+    Kernel-->>Server: New socket FD
+    
+    Server->>Worker: Dispatch to worker
+    Worker->>Kernel: recv() request data
+    Kernel-->>Worker: HTTP request bytes
+    
+    Worker->>Worker: Parse HTTP
+    Worker->>App: Route to handler
+    App->>App: Process request
+    App-->>Worker: Response data
+    
+    Worker->>Kernel: send() response
+    Kernel->>NIC: Queue packets
+    NIC->>Client: HTTP Response
+```
+
+## Connection Handling Models
+
+### 1. One Thread Per Connection
+
+```mermaid
+graph TD
+    subgraph "Main Thread"
+        LISTEN[Listen Socket]
+        ACCEPT[accept()]
+    end
+    
+    subgraph "Worker Threads"
+        T1[Thread 1<br/>Client A]
+        T2[Thread 2<br/>Client B]
+        T3[Thread 3<br/>Client C]
+        T4[Thread Pool<br/>Waiting...]
+    end
+    
+    ACCEPT -->|New Connection| T1
+    ACCEPT -->|New Connection| T2
+    ACCEPT -->|New Connection| T3
+    
+    style LISTEN fill:#ff9999
+    style T1 fill:#99ff99
+    style T2 fill:#99ff99
+    style T3 fill:#99ff99
+```
+
+**Pros:**
+- Simple programming model
+- Good for CPU-bound requests
+- Natural request isolation
+
+**Cons:**
+- Thread creation overhead
+- Memory usage per thread (~1-8MB)
+- Context switching costs
+- Limited by thread count
+
+### 2. Event-Driven (Single Thread)
+
+```mermaid
+graph TD
+    subgraph "Event Loop"
+        EPOLL[epoll/kqueue]
+        HANDLER[Event Handler]
+    end
+    
+    subgraph "Sockets"
+        S1[Socket 1]
+        S2[Socket 2]
+        S3[Socket 3]
+        S4[Socket N...]
+    end
+    
+    S1 -->|readable| EPOLL
+    S2 -->|writable| EPOLL
+    S3 -->|readable| EPOLL
+    S4 -->|events| EPOLL
+    
+    EPOLL --> HANDLER
+    HANDLER -->|Process| S1
+    HANDLER -->|Process| S2
+    HANDLER -->|Process| S3
+    
+    style EPOLL fill:#ffcc99
+    style HANDLER fill:#99ccff
+```
+
+**Pros:**
+- Minimal memory usage
+- No context switching
+- Can handle 10K+ connections
+- Excellent for I/O-bound tasks
+
+**Cons:**
+- Complex programming model
+- Single CPU core limitation
+- Blocking operations halt all requests
+
+### 3. Multi-Process (Pre-fork)
+
+```mermaid
+graph TD
+    subgraph "Master Process"
+        MASTER[Master]
+        LISTEN[Listen Socket]
+    end
+    
+    subgraph "Worker Processes"
+        P1[Process 1<br/>CPU 0]
+        P2[Process 2<br/>CPU 1]
+        P3[Process 3<br/>CPU 2]
+        P4[Process 4<br/>CPU 3]
+    end
+    
+    MASTER -->|fork()| P1
+    MASTER -->|fork()| P2
+    MASTER -->|fork()| P3
+    MASTER -->|fork()| P4
+    
+    LISTEN -.->|accept()| P1
+    LISTEN -.->|accept()| P2
+    LISTEN -.->|accept()| P3
+    LISTEN -.->|accept()| P4
+    
+    style MASTER fill:#ff9999
+    style P1 fill:#99ff99
+    style P2 fill:#99ff99
+    style P3 fill:#99ff99
+    style P4 fill:#99ff99
+```
+
+**Pros:**
+- True parallelism
+- Process isolation
+- Crash resilience
+- Utilizes all CPU cores
+
+**Cons:**
+- Memory overhead
+- IPC complexity
+- Slower context switches
+
+## Hands-On Examples
+
+### Example 1: Basic HTTP Server (`01_basic_http_server.py`)
+
+```python
+# Run a simple HTTP server to see request lifecycle
+python 01_basic_http_server.py
+```
+
+### Example 2: Connection Handling Models (`02_connection_models.py`)
+
+```python
+# Compare different server architectures
+python 02_connection_models.py
+```
+
+### Example 3: Request Lifecycle Tracer (`03_request_tracer.py`)
+
+```python
+# Trace the complete request lifecycle
+python 03_request_tracer.py
+```
+
+## Performance Characteristics
+
+### Request Processing Stages
+
+| Stage | Typical Time | Bottleneck |
+|-------|--------------|------------|
+| Network packet arrival | ~10-50 μs | NIC and kernel processing |
+| TCP handshake (new connection) | ~100-300 μs | Network RTT |
+| Accept system call | ~1-5 μs | Kernel scheduling |
+| HTTP parsing | ~5-20 μs | CPU and parser efficiency |
+| Application logic | Variable | Database, I/O, computation |
+| Response generation | ~10-50 μs | Template rendering, serialization |
+| Send response | ~10-50 μs | Network bandwidth |
+
+### Concurrency Model Comparison
+
+| Model | Max Connections | Memory/Connection | CPU Utilization | Best For |
+|-------|-----------------|-------------------|-----------------|----------|
+| Thread per connection | ~1000s | 1-8 MB | Good | CPU-bound, simple apps |
+| Event-driven | ~100,000s | ~10 KB | Single core | I/O-bound, websockets |
+| Pre-fork | ~10,000s | Process overhead | Excellent | Mixed workloads |
+| Hybrid (e.g., nginx) | ~1,000,000s | ~1 KB | Excellent | High-performance servers |
+
+## System Calls in Action
+
+Key system calls during request processing:
+
+1. **accept()** - Accept new connection
+2. **recv()/read()** - Read request data
+3. **send()/write()** - Send response data
+4. **close()** - Close connection
+5. **epoll_wait()/select()** - Wait for events (event-driven)
+6. **fork()** - Create worker process (pre-fork)
+7. **pthread_create()** - Create worker thread
+
+## Quick Exercise
+
+Run the examples to see different server models in action:
+
+```bash
+# 1. Start the basic HTTP server
+python 01_basic_http_server.py
+
+# 2. In another terminal, test it
+curl http://localhost:8080/
+curl http://localhost:8080/slow
+ab -n 1000 -c 10 http://localhost:8080/  # Apache Bench
+
+# 3. Compare connection models
+python 02_connection_models.py
+
+# 4. Trace request lifecycle
+python 03_request_tracer.py
+```
+
+## Key Takeaways
+
+✅ HTTP requests go through multiple system layers before reaching application code
+
+✅ Different connection models have distinct trade-offs between simplicity and performance
+
+✅ The kernel plays a crucial role in managing connections and data transfer
+
+✅ Modern servers often use hybrid approaches for optimal performance
+
+✅ Understanding the full lifecycle helps identify bottlenecks
+
+## Next Module
+
+[Module 3: Multithreading in Python](../03-multithreading/README.md) - Deep dive into concurrent request handling with threads
